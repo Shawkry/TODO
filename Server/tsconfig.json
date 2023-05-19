@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*","bin/*"]
+    }
+  },
+  "ts-node": {
+    "files": true,
+    "compilerOptions": {
+      "baseUrl": ".",
+      "paths": {
+        "@/*": ["src/*","bin/*"]
+      }
+    }
+  }
+}

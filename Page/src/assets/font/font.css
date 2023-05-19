@@ -1,0 +1,13 @@
+@font-face {
+    font-family: 'LED';
+    src        : url('UnidreamLED.ttf');
+    font-weight: normal;
+    font-style : normal;
+}
+
+@font-face {
+    font-family: 'TimeFont';
+    src        : url('YournameD7HomeHalf.ttf');
+    font-weight: normal;
+    font-style : normal;
+}
