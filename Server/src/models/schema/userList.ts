@@ -5,14 +5,14 @@
  * ⭐ @Description: 用户表
  */
 import mongoose, { Schema } from "mongoose";
-import { CONFIG } from "../../config";
-const {
-  DB: { host, user, password },
-} = CONFIG;
-const TABLE_NAME = "Userlist";
+const TABLE_NAME = "UserList";
+
 mongoose.connect(
-  `mongodb://${user}:${password}@${host}/Todo?authSource=admin`,
-  { useNewUrlParser: true, useUnifiedTopology: true }
+  `mongodb://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}/Todo?authSource=admin`,
+  {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  },
 );
 const UserListSchema = new Schema({
   userName: {
@@ -30,7 +30,7 @@ const UserListSchema = new Schema({
   avatar: {
     type: String,
     require: true,
-    defult: "/img",
+    default: "/img",
   },
 });
-module.exports = mongoose.model(TABLE_NAME, UserListSchema);
+export default mongoose.model(TABLE_NAME, UserListSchema);

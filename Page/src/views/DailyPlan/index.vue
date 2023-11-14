@@ -15,7 +15,9 @@
           color: white;
           padding: 1rem;
           float: right;
-          text-shadow: #000 1px 0 0, #000 0 1px 0;
+          text-shadow:
+            #000 1px 0 0,
+            #000 0 1px 0;
         "
         @click="showTime = true"
       >
@@ -61,7 +63,7 @@
                 taskForm.message = item.message;
                 taskForm.tag = item.tag;
                 taskForm.workTime = item.workTime;
-                updateItem = item._id;
+                updateItem = item._id ?? null;
               }
             "
           />
@@ -103,7 +105,7 @@
       position="top"
       @closed="
         () => {
-          updateItem = false;
+          updateItem = null;
           taskForm.message = '';
           taskForm.tag = '';
           taskForm.workTime = '';
@@ -178,7 +180,7 @@
         cancel-button-text="回到当天"
         type="month-day"
         title="选择月日"
-        :formatter="formatter"
+        :formatter="formatTimeSelect"
         @confirm="timeSelect"
         @cancel="
           () => {
@@ -192,7 +194,7 @@
     <!-- 待办类型选择弹窗 -->
     <van-popup v-model:show="showTagPicker" round position="bottom">
       <van-picker
-        :columns="tagList"
+        :columns="TAG_LIST"
         @cancel="showTagPicker = false"
         @confirm="
           (value) => {
@@ -207,41 +209,45 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from "vue";
-import dayjs from "dayjs";
-import request from "@/common/request";
 import { Notify } from "vant";
+import dayjs from "dayjs";
+import request from "@/utils/request";
+import { TAG_LIST, TAG_TYPE, TODO_TYPE } from "@/constants/task";
+import { API_LIST } from "@/constants/api";
+import { NOTIFY_TYPE } from "@/constants/code";
+import { TIME_CONSTANTS } from "@/constants/date";
+import type { ITask } from "@/types";
+
 const showTagPicker = ref<boolean>(false); //显示待办类型选择弹窗
-const tagList = ["学习", "工作", "备忘", "娱乐", "运动"]; //待办类型list
 const showTime = ref<boolean>(false); //显示时间选转弹窗
 const showDialog = ref<boolean>(false); //总结编辑弹窗
 const currentDate = ref(new Date()); //当前时间
-const updateItem = ref<boolean | string>(false); //编辑待办项
+const updateItem = ref<string | null>(null); //编辑待办项
 const showPopup = ref<boolean>(false); //新增待办弹窗
-//每日总结
-const summary = ref<any>({
+const summary = ref<ITask>({
   message: "",
   time: new Date(),
-  type: 2,
+  type: TODO_TYPE.SUMMARY,
   finish: false,
   tag: "",
   workTime: "",
 });
 // 提交待办表单
-const taskForm = reactive<any>({
+const taskForm = reactive<ITask>({
   message: "",
   time: new Date(),
-  type: 1,
+  type: TODO_TYPE.TASK,
   tag: "",
   workTime: "",
 });
 // 今日待办列表
-const data = reactive<any>({
+const data = reactive<{ list: ITask[] }>({
   list: [
     {
       message: "",
       finish: false,
       time: new Date(),
-      type: 1,
+      type: TODO_TYPE.TASK,
       workTime: "",
     },
   ],
@@ -251,22 +257,20 @@ const data = reactive<any>({
  * 🍊 @description: 格式化日期弹窗显示
  * 🍊 @Date: 2022-02-05 14:23:10
 ================================================================================================ */
-const formatter = (type: any, val: any) => {
+const formatTimeSelect = (type: string, val: string) => {
   if (type === "month") {
     return `${val}月`;
-  } else if (type === "day") {
-    return `${val}日`;
   }
-  return val;
+  return `${val}日`;
 };
 
 /* ================================================================================================
  * 🍊 @description: 选择日期
  * 🍊 @Date: 2022-02-05 14:21:58
 ================================================================================================ */
-const timeSelect = (value: Date) => {
+const timeSelect = async (value: Date) => {
   currentDate.value = value;
-  getData(currentDate.value);
+  await getData(currentDate.value);
   showTime.value = false;
 };
 
@@ -276,92 +280,118 @@ const timeSelect = (value: Date) => {
 ================================================================================================ */
 const submitTaskForm = async () => {
   taskForm.time = dayjs(currentDate.value).format("YYYY-MM-DD");
-  if (updateItem.value !== false) {
-    request
-      .post("upDateTask", {
-        taskId: updateItem.value,
-        message: taskForm.message,
-        tag: taskForm.tag,
-        workTime: taskForm.workTime,
-      })
-      .then((res: any) => {
-        showPopup.value = false;
-        taskForm.message = "";
-        taskForm.tag = "";
-        taskForm.workTime = "";
-        Notify({ type: res.type, message: res.message, duration: 1000 });
-        getData();
-      });
-  } else {
-    request.post("createTask", taskForm).then((res: any) => {
-      showPopup.value = false;
-      taskForm.message = "";
-      taskForm.tag = "";
-      taskForm.workTime = "";
-      Notify({ type: res.type, message: res.message, duration: 1000 });
-      getData();
-    });
+  let requestUrl = API_LIST.CREATE_TASK;
+  let requestParams: ITask = taskForm;
+  if (updateItem.value) {
+    requestUrl = API_LIST.UPDATE_TASK;
+    requestParams = {
+      _id: updateItem.value,
+      message: taskForm.message,
+      tag: taskForm.tag,
+      workTime: taskForm.workTime,
+    };
   }
-  updateItem.value = false;
+
+  const res = await request.post(requestUrl, requestParams);
+  if (!res) {
+    return Notify({ type: NOTIFY_TYPE.DANGER, message: "网络错误" });
+  }
+  showPopup.value = false;
+  taskForm.message = "";
+  taskForm.tag = "";
+  taskForm.workTime = "";
+  Notify({
+    type: NOTIFY_TYPE.SUCCESS,
+    message: res.message,
+    duration: TIME_CONSTANTS.ONE_SECOND,
+  });
+  await getData();
+  updateItem.value = null;
 };
 /* ================================================================================================
  * 🍊 @description: 删除待办
  * 🍊 @Date: 2022-02-05 14:24:01
 ================================================================================================ */
-const deleteTask = (task: object) => {
-  request.post("deleteTask", task).then((res: any) => {
-    Notify({ type: res.type, message: res.message, duration: 1000 });
-    getData();
+const deleteTask = async (task: ITask) => {
+  const res = await request.post(API_LIST.DELETE_TASK, task);
+  if (!res) return Notify({ type: NOTIFY_TYPE.DANGER, message: "网络错误" });
+  Notify({
+    type: NOTIFY_TYPE.SUCCESS,
+    message: res.message,
+    duration: TIME_CONSTANTS.ONE_SECOND,
   });
+  await getData();
 };
 /* ================================================================================================
  * 🍊 @description: 更新待办完成情况
  * 🍊 @Date: 2022-02-05 14:24:13
 ================================================================================================ */
-const finishTask = (item: any) => {
-  request.post("finishTask", { id: item._id }).then((res) => {
-    getData();
-  });
+const finishTask = async (task: ITask) => {
+  await request.post(API_LIST.FINISH_TASK, { id: task._id });
+  await getData();
 };
 
 /* ================================================================================================
  * 🍊 @description: 新增或修改每日总结
  * 🍊 @Date: 2022-02-05 14:30:02
 ================================================================================================ */
-const uploadSummary = () => {
+const uploadSummary = async () => {
   summary.value.time = dayjs(currentDate.value).format("YYYY-MM-DD");
-  request
-    .post("createTask", {
-      message: summary.value.message,
-      time: dayjs(summary.value.time).format("YYYY-MM-DD"),
-      tag: "总结",
-      workTime: 0,
-      type: 2,
-    })
-    .then((res: any) => {
-      showPopup.value = false;
-      taskForm.message = "";
-      Notify({ type: res.type, message: res.message, duration: 1000 });
-      getData();
+  const res = await request.post(API_LIST.CREATE_TASK, {
+    message: summary.value.message,
+    time: dayjs(summary.value.time).format("YYYY-MM-DD"),
+    tag: TAG_TYPE.SUMMARY,
+    workTime: 0,
+    type: TODO_TYPE.SUMMARY,
+  });
+  if (!res) {
+    return Notify({
+      type: NOTIFY_TYPE.DANGER,
+      message: "新增或修改每日总结失败",
     });
+  }
+  showPopup.value = false;
+  taskForm.message = "";
+  Notify({
+    type: NOTIFY_TYPE.SUCCESS,
+    message: res.message,
+    duration: TIME_CONSTANTS.ONE_SECOND,
+  });
+  await getData();
 };
 /* ================================================================================================
- * 🍊 @description: 拉取数据
+ * 🍊 @description: 获取每日任务和每日总结数据
  * 🍊 @Date: 2022-02-05 14:30:15
 ================================================================================================ */
-const getData = (date: Date = currentDate.value) => {
+const getData = async (date: Date = currentDate.value) => {
   summary.value.message = "";
-  request.post("getData", { time: date, mode: "1" }).then((res: any) => {
-    data.list = res;
+  const taskRes = await request.post(API_LIST.GET_TASK_DATA, {
+    time: date,
+    type: TODO_TYPE.TASK,
   });
-  request.post("getData", { time: date, mode: "2" }).then((res: any) => {
-    if (res.length !== 0) {
-      summary.value = res[0];
-    }
+  if (!taskRes || !taskRes?.data) {
+    return Notify({
+      type: NOTIFY_TYPE.DANGER,
+      message: "获取每日任务数据失败",
+    });
+  }
+  data.list = taskRes.data;
+  const summaryRes = await request.post(API_LIST.GET_TASK_DATA, {
+    time: date,
+    type: TODO_TYPE.SUMMARY,
   });
+  if (!summaryRes || !summaryRes?.data) {
+    return Notify({
+      type: NOTIFY_TYPE.DANGER,
+      message: "获取每日总结数据失败",
+    });
+  }
+  if (!summaryRes.data?.length) return;
+
+  summary.value = summaryRes.data[0];
 };
-onMounted(() => {
-  getData();
+onMounted(async () => {
+  await getData();
 });
 </script>
 <style>
@@ -378,16 +408,7 @@ onMounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  //   background-color: #879cb7 !important;
   background-image: url(@/assets/img/background.jpg);
-  //   background-image: linear-gradient(
-  //     to bottom,
-  //     #729ecd,
-  //     #89add4,
-  //     #9fbbda,
-  //     #b6cae0,
-  //     #ccd9e7
-  //   );
   background-size: 100% 100%;
   color: #000;
 }

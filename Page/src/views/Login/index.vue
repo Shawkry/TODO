@@ -6,10 +6,11 @@
  -->
 <template>
   <div class="login">
-    <div class="form-structor">
-      <div class="signup">
-        <h2 class="form-title" id="signup" ref="signup"><span>或</span>登陆</h2>
-
+    <div class="form-structure">
+      <div class="register">
+        <h2 class="form-title" id="register" ref="registerRef">
+          <span>或</span>登陆
+        </h2>
         <div class="form-holder">
           <input
             v-model="user.userName"
@@ -27,11 +28,13 @@
         <div class="textBox">
           <span class="text" @click="findPWDShow = true">找回密码</span>
         </div>
-        <button class="submit-btn" @click="loginFunc()">登录</button>
+        <button class="submit-btn" @click="login()">登录</button>
       </div>
       <div class="login slide-up">
         <div class="center">
-          <h2 class="form-title" id="login" ref="login"><span>或</span>注册</h2>
+          <h2 class="form-title" id="login" ref="loginRef">
+            <span>或</span>注册
+          </h2>
           <div class="form-holder slide-up">
             <input
               v-model="newUser.userName"
@@ -58,7 +61,7 @@
               required
             />
           </div>
-          <button class="submit-btn" @click="signupFunc()">注册</button>
+          <button class="submit-btn" @click="register()">注册</button>
         </div>
       </div>
     </div>
@@ -66,14 +69,7 @@
       v-model:show="findPWDShow"
       title="找回密码"
       @confirm="findPassword()"
-      @cancel="
-        () => {
-          findPasswordData.userName = '';
-          findPasswordData.eMail = '';
-          findPasswordData.password = '';
-        }
-      "
-      :beforeClose="beforeCloseFunc"
+      :beforeClose="beforeClose"
       show-cancel-button
       confirmButtonColor="#91b185"
       cancelButtonColor="#aaa"
@@ -88,7 +84,7 @@
               :rules="[
                 { required: true, message: '请填写用户账号' },
                 {
-                  pattern: /^[a-zA-Z0-9]{3,10}$/,
+                  pattern: USER_NAME_REGEXP,
                   message: '账号格式错误',
                 },
               ]"
@@ -102,7 +98,7 @@
               :rules="[
                 { required: true, message: '请填写用户邮箱' },
                 {
-                  pattern: /^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$/,
+                  pattern: EMAIL_REGEXP,
                   message: '不是正确的邮箱格式',
                 },
               ]"
@@ -116,7 +112,7 @@
               :rules="[
                 { required: true, message: '请填写新的密码' },
                 {
-                  pattern: /^(?=.*\d)(?=.*[a-zA-Z])[\da-zA-Z~!@#$%^&*]{6,18}$/,
+                  pattern: PASSWORD_REGEXP,
                   message: '新密码必须为6～18字符，包含英文和数字',
                 },
               ]"
@@ -129,26 +125,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { Notify } from "vant";
-import request from "@/common/request";
+import request from "@/utils/request";
 import { useStore } from "vuex";
-import dayjs from "dayjs";
+import {
+  EMAIL_REGEXP,
+  PASSWORD_REGEXP,
+  USER_NAME_REGEXP,
+} from "@/constants/userRegExp";
+import type { IUser } from "@/types";
+import { API_LIST } from "@/constants/api";
+import { CODE, NOTIFY_TYPE } from "@/constants/code";
+import { newTip } from "@/constants/newTip";
 const router = useRouter();
 const store = useStore();
-const login = ref<any>();
-const signup = ref<any>();
-const user = reactive({
+const loginRef = ref<any>();
+const registerRef = ref<any>();
+const user = ref({
   userName: "",
   password: "",
 });
-const newUser = reactive({
+const newUser = ref<IUser>({
   userName: "",
   password: "",
   eMail: "",
 });
-const findPasswordData = reactive({
+const findPasswordData = ref<IUser>({
   userName: "",
   password: "",
   eMail: "",
@@ -158,112 +162,92 @@ const findPWDShow = ref<boolean>(false);
  * 🍊 @description: 禁止弹窗点击确认后自动关闭
  * 🍊 @Date: 2022-04-26 15:08:02
 ================================================================================================ */
-const beforeCloseFunc = (action: string) => {
-  if (action === "confirm") {
-  } else {
+const beforeClose = (action: string) => {
+  if (action !== "confirm") {
     findPWDShow.value = false;
   }
-  return undefined;
+  return;
+};
+/* ================================================================================================
+ * 🍊 @description: 校验是否是符合规范的用户输入
+ * 🍊 @Date: 2022-04-26 14:08:02
+================================================================================================ */
+const isLegitimateUser = (user: IUser) => {
+  if (!user) return false;
+  const isLegitimateUserName = USER_NAME_REGEXP.test(user.userName);
+  const isLegitimatePassword = PASSWORD_REGEXP.test(user.password);
+  const isLegitimateEMail = EMAIL_REGEXP.test(user?.eMail ?? "");
+  return isLegitimateUserName && isLegitimatePassword && isLegitimateEMail;
 };
 /* ================================================================================================
  * 🍊 @description: 找回密码
  * 🍊 @Date: 2022-04-26 11:36:16
 ================================================================================================ */
-const findPassword = () => {
-  const isLegitimateUserName = /^[a-zA-Z0-9]{3,10}$/.test(
-    findPasswordData.userName
-  );
-  const isLegitimatePassword =
-    /^(?=.*\d)(?=.*[a-zA-Z])[\da-zA-Z~!@#$%^&*]{6,18}$/.test(
-      findPasswordData.password
-    );
-  const isLegitimateEMail =
-    /^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$/.test(
-      findPasswordData.eMail
-    );
-  if (!isLegitimateUserName || !isLegitimatePassword || !isLegitimateEMail) {
+const findPassword = async () => {
+  if (!isLegitimateUser(findPasswordData.value)) {
     return Notify({
+      type: NOTIFY_TYPE.DANGER,
       message: "请检查输入内容是否正确",
-      type: "danger",
     });
   }
-  request.post("/updatePassword", findPasswordData).then((res: any) => {
-    if (res.code === 1) {
-      findPasswordData.userName = "";
-      findPasswordData.eMail = "";
-      findPasswordData.password = "";
-      findPWDShow.value = false;
-      Notify({
-        message: res.message,
-        type: "success",
-      });
-    } else {
-      Notify({
-        message: res.message,
-        type: "danger",
-      });
-    }
+  const respond = await request.post(
+    API_LIST.UPDATE_PASSWORD,
+    findPasswordData.value,
+  );
+  if (!respond || respond?.code !== CODE.SUCCESS) {
+    return Notify({
+      type: NOTIFY_TYPE.DANGER,
+      message: respond?.message ?? "网络错误",
+    });
+  }
+  findPasswordData.value = {
+    userName: "",
+    password: "",
+    eMail: "",
+  };
+  findPWDShow.value = false;
+  Notify({
+    type: NOTIFY_TYPE.SUCCESS,
+    message: respond.message,
   });
 };
 /* ================================================================================================
  * 🍊 @description: 注册事件
  * 🍊 @Date: 2022-02-08 14:51:17
 ================================================================================================ */
-const signupFunc = () => {
-  let bool = true;
-  const messageFunc = (type: any, message: string) => {
-    Notify({
-      message: message,
-      type: type,
+const register = async () => {
+  if (!isLegitimateUser(newUser.value)) {
+    return Notify({
+      type: NOTIFY_TYPE.WARNING,
+      message: "格式不正确，请检查输入再提交！",
     });
-  };
-  const isLegitimateUserName = /^[a-zA-Z0-9]{3,10}$/.test(newUser.userName);
-  const isLegitimatePassword =
-    /^(?=.*\d)(?=.*[a-zA-Z])[\da-zA-Z~!@#$%^&*]{6,18}$/.test(newUser.password);
-  const isLegitimateEMail =
-    /^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$/.test(newUser.eMail);
-  console.log(isLegitimateUserName, isLegitimatePassword, isLegitimateEMail);
-  if (!isLegitimateUserName || !isLegitimatePassword || !isLegitimateEMail) {
-    return messageFunc("warning", "格式不正确，请检查输入再提交！");
   }
-  request.post("register", newUser).then((res: any) => {
-    const type = res.code === 0 ? "danger" : "success";
-    if (res.code === 1) {
-      user.userName = newUser.userName;
-      user.password = newUser.password;
-      loginFunc();
-    }
-    messageFunc(type, res.message);
+  const respond = await request.post(API_LIST.REGISTER, newUser.value);
+  if (respond?.code === CODE.SUCCESS) {
+    user.value = newUser.value;
+    await login();
+  }
+  Notify({
+    type:
+      respond?.code === CODE.SUCCESS ? NOTIFY_TYPE.SUCCESS : NOTIFY_TYPE.DANGER,
+    message: respond?.message ?? "网络错误",
   });
-
-  // messageShow.value = true;
 };
 /* ================================================================================================
  * 🍊 @description: 登录事件
  * 🍊 @Date: 2022-02-08 14:50:52
 ================================================================================================ */
-const loginFunc = () => {
-  request.post("login", user).then((res: any) => {
-    store.commit("setUser", res.token);
-    if (res.code === 1) {
-      request
-        .post("newTip", {
-          message: "👈左划可以编辑和删除哦",
-          time: dayjs(new Date()).format("YYYY-MM-DD"),
-          type: 1,
-          tag: "学习",
-          workTime: "0",
-        })
-        .then((res) => {
-          router.push({ path: "/home/dailyPlan" });
-        });
-    } else {
-      Notify({
-        message: "账号或密码不正确！",
-        type: "danger",
-      });
-    }
-  });
+const login = async () => {
+  const respond = await request.post(API_LIST.LOGIN, user.value);
+  if (!respond || respond?.code !== CODE.SUCCESS) {
+    return Notify({
+      type: NOTIFY_TYPE.DANGER,
+      message: respond?.message ?? "账号或密码不正确！",
+    });
+  }
+  store.commit("setUser", respond.data);
+  await request.post(API_LIST.NEW_TIP, newTip);
+  await router.push({ path: "/home/dailyPlan" });
 };
 /* ================================================================================================
  * 🍊 @description: 登录注册跳转监听
@@ -271,22 +255,21 @@ const loginFunc = () => {
 ================================================================================================ */
 const init = () => {
   console.clear();
-  const loginBtn = login.value;
-  const signupBtn = signup.value;
+  const loginBtn = loginRef.value;
+  const registerBtn = registerRef.value;
   loginBtn.addEventListener("click", (e: any) => {
-    let parent = e.target.parentNode.parentNode;
+    const parent = e.target.parentNode.parentNode;
     Array.from(e.target.parentNode.parentNode.classList).find((element) => {
       if (element !== "slide-up") {
         parent.classList.add("slide-up");
       } else {
-        signupBtn.parentNode.classList.add("slide-up");
+        registerBtn.parentNode.classList.add("slide-up");
         parent.classList.remove("slide-up");
       }
     });
   });
-
-  signupBtn.addEventListener("click", (e: any) => {
-    let parent = e.target.parentNode;
+  registerBtn.addEventListener("click", (e: any) => {
+    const parent = e.target.parentNode;
     Array.from(e.target.parentNode.classList).find((element) => {
       if (element !== "slide-up") {
         parent.classList.add("slide-up");
@@ -296,19 +279,16 @@ const init = () => {
       }
     });
   });
-  // messageShow.value = true;
 };
 onMounted(() => {
-  // nextTick();
   init();
 });
-onBeforeRouteLeave((to: any, form: any, next: any) => {
+onBeforeRouteLeave((_to, _form, next) => {
   if (store.getters.getUser !== "") {
     next();
   } else {
-    Notify({ message: "请先登录", type: "danger" });
+    Notify({ message: "请先登录", type: NOTIFY_TYPE.DANGER });
   }
-  // if(store.getters('getuser'))
 });
 </script>
 
@@ -322,27 +302,22 @@ onBeforeRouteLeave((to: any, form: any, next: any) => {
     color: #eee;
     font-size: 12px;
     border-bottom: 1px solid #ddd;
-    // text-decoration:underline;
   }
 }
 .registerInput:focus:invalid {
-  background: #fff url(@/assets/img/error.png) no-repeat;
-  background-position: right 50px center;
+  background: #fff url(@/assets/img/error.png) no-repeat right 50px center;
   background-size: 20px;
 }
 .registerInput:focus:valid {
-  background: #fff url(@/assets/img/success.png) no-repeat;
-  background-position: right 50px center;
+  background: #fff url(@/assets/img/success.png) no-repeat right 50px center;
   background-size: 20px;
 }
-.form-structor {
+.form-structure {
   background-color: #222;
-  //   border-radius: 15px;
   height: 550px;
   width: 100%;
   position: relative;
   overflow: hidden;
-
   &::after {
     content: "";
     opacity: 0.8;
@@ -357,8 +332,7 @@ onBeforeRouteLeave((to: any, form: any, next: any) => {
     // background-image: url("https://images.unsplash.com/photo-1503602642458-232111445657?ixlib=rb-0.3.5&ixid=eyJhcHBfaWQiOjEyMDd9&s=bf884ad570b50659c5fa2dc2cfb20ecf&auto=format&fit=crop&w=1000&q=100");
     background-image: url("@/assets/img/background.jpg");
   }
-
-  .signup {
+  .register {
     position: absolute;
     top: 50%;
     left: 50%;

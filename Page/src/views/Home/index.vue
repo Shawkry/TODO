@@ -10,20 +10,19 @@
       <router-view></router-view>
     </div>
     <div class="tabBar">
-      <TabBar></TabBar>
+      <TabBar />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
-import TabBar from "./tabBar.vue";
+import TabBar from "@/components/TabBar/index.vue";
 const active = ref("dailyPlan");
 </script>
 
 <style lang="scss" scoped>
 .main {
-  /* color: ghostwhite; */
   position: absolute;
   top: 0;
   width: 100%;
@@ -37,7 +36,6 @@ const active = ref("dailyPlan");
   position: absolute;
   height: 91%;
   width: 100%;
-  /*background-color: #51d5c2;*/
 }
 .container {
   max-width: none;

@@ -5,14 +5,13 @@
  * ⭐ @Description: 数据表
  */
 import mongoose, { Schema } from "mongoose";
-import { CONFIG } from "../../config";
-const {
-  DB: { host, user, password },
-} = CONFIG;
-const TABLE_NAME = "Todolist";
+const TABLE_NAME = "TodoList";
 mongoose.connect(
-  `mongodb://${user}:${password}@${host}/Todo?authSource=admin`,
-  { useNewUrlParser: true, useUnifiedTopology: true }
+  `mongodb://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}/Todo?authSource=admin`,
+  {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  },
 );
 const TodoListSchema = new Schema({
   time: {
@@ -44,4 +43,5 @@ const TodoListSchema = new Schema({
     required: true,
   },
 });
-module.exports = mongoose.model(TABLE_NAME, TodoListSchema);
+
+export default mongoose.model(TABLE_NAME, TodoListSchema);

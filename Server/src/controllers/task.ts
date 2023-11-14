@@ -1,4 +1,4 @@
-import crypto from "@/common/crypto.js";
+import crypto from "@/utils/crypto";
 import dayjs from "dayjs";
 import {
   findOneTaskByQueryRule,
@@ -8,24 +8,33 @@ import {
   deleteTodo,
 } from "@/models/tasks";
 import { TODO_TYPE } from "@/constants/task";
+import { CODE } from "@/constants/http_code";
+import type { ITask, IRequest, IRespond, IQueryTask } from "@/types";
 
-export const getTodayTaskData = async (req, res) => {
-  const user = crypto.decrypt(req.headers.authorization);
-  const { time, mode } = req.body?.data;
+export const getTodayTaskData = async (
+  req: IRequest<{ time: Date; type: number }>,
+  res: IRespond<ITask>,
+) => {
+  const userId: string = crypto.decrypt(req.headers.authorization);
+  const { time, type } = req.body?.data;
   const today = {
     begin: new Date(dayjs(time).format("YYYY-MM-DD")),
     end: new Date(dayjs(time).add(1, "day").format("YYYY-MM-DD")),
   };
-  const queryRule = { time: { $gte: today.begin, $lt: today.end }, user: user };
-  if (mode) queryRule["type"] = Number(mode);
+  const queryRule: IQueryTask = {
+    time: { $gte: today.begin, $lt: today.end },
+    user: userId,
+  };
+  if (type) queryRule["type"] = type;
   const tasks = await findTasksByQueryRule(queryRule);
-  if (tasks) return res.json(tasks);
+  if (tasks)
+    return res.json({ code: CODE.SUCCESS, message: "ok", data: tasks });
 };
 
-export const createTask = async (req, res) => {
+export const createTask = async (req: IRequest<ITask>, res: IRespond<{}>) => {
   const user = crypto.decrypt(req.headers.authorization);
   const { type, message, time, tag, workTime } = req.body?.data;
-  const todo = {
+  const todo: ITask = {
     message: message,
     type: type,
     time: new Date(time),
@@ -34,7 +43,6 @@ export const createTask = async (req, res) => {
     workTime: Number(workTime),
     user: user,
   };
-
   if (todo.type === TODO_TYPE.SUMMARY) {
     const today = {
       begin: new Date(dayjs(todo.time).format("YYYY-MM-DD")),
@@ -49,21 +57,21 @@ export const createTask = async (req, res) => {
     if (task) {
       task.message = todo.message;
       await updateTodo(task);
-      res.json({ type: "success", message: "修改总结成功" });
-    } else {
+      res.json({ code: CODE.SUCCESS, message: "修改总结成功" });
+    } else if (todo.message) {
       await createTodo(todo);
-      res.json({ type: "success", message: "新增总结成功" });
+      res.json({ code: CODE.SUCCESS, message: "新增总结成功" });
     }
   } else if (todo.type === TODO_TYPE.TASK) {
     await createTodo(todo);
-    res.json({ type: "success", message: "新增任务成功" });
+    res.json({ code: CODE.SUCCESS, message: "新增任务成功" });
   }
 };
 
-export const updateTask = async (req, res) => {
-  const user = crypto.decrypt(req.headers.authorization);
+export const updateTask = async (req: IRequest<ITask>, res: IRespond<{}>) => {
+  const user: string = crypto.decrypt(req.headers.authorization);
   const { data } = req.body;
-  const queryRule = { _id: data.taskId, user: user };
+  const queryRule = { _id: data._id, user: user };
   const task = await findOneTaskByQueryRule(queryRule);
   if (task) {
     task.message = data.message;
@@ -71,19 +79,37 @@ export const updateTask = async (req, res) => {
     task.workTime = Number(data.workTime);
     task.finish = false;
     await updateTodo(task);
-    res.json({ type: "success", message: "修改任务成功" });
+    res.json({
+      code: CODE.SUCCESS,
+      message: "删除任务成功",
+      data: { type: "success" },
+    });
   } else {
-    res.json({ type: "error", message: "修改任务失败" });
+    res.json({
+      code: CODE.ERROR,
+      message: "删除任务成功",
+      data: { type: "success" },
+    });
   }
 };
 
-export const deleteTask = async (req, res) => {
+export const deleteTask = async (
+  req: IRequest<{ user: string }>,
+  res: IRespond<{}>,
+) => {
   req.body.data.user = crypto.decrypt(req.headers.authorization);
   await deleteTodo(req.body.data);
-  res.json({ type: "success", message: "删除任务成功" });
+  res.json({
+    code: CODE.SUCCESS,
+    message: "删除任务成功",
+    data: { type: "success" },
+  });
 };
 
-export const finishTask = async (req, res) => {
+export const finishTask = async (
+  req: IRequest<{ id: string }>,
+  res: IRespond<{}>,
+) => {
   const user = crypto.decrypt(req.headers.authorization);
   const { id } = req.body?.data;
   const queryRule = { _id: id, user: user };
@@ -91,64 +117,71 @@ export const finishTask = async (req, res) => {
   if (task) {
     task.finish = !task.finish;
     await updateTodo(task);
-    res.json({ code: "200" });
+    res.json({ code: CODE.SUCCESS, message: "完成任务成功" });
   } else {
-    res.json({ code: "404" });
+    res.json({ code: CODE.ERROR, message: "完成任务失败" });
   }
 };
 
-export const addFocusTime = async (req, res) => {
+export const addFocusTime = async (
+  req: IRequest<{
+    startTime: string[];
+    timeLength: number;
+    task: ITask;
+  }>,
+  res: IRespond<{}>,
+) => {
   const user = crypto.decrypt(req.headers.authorization);
   const { data } = req.body;
-  data.startTime = new Date(
+  const startTime = new Date(
     Number(data.startTime[0]),
-    Number(data.startTime[1] - 1),
+    Number(data.startTime[1]) - 1,
     Number(data.startTime[2]),
     Number(data.startTime[3]),
-    Number(data.startTime[4])
+    Number(data.startTime[4]),
   );
-  const value = {
+  const todo = {
     message: data.task.message,
-    time: data.startTime,
+    time: startTime,
     type: TODO_TYPE.FOCUS,
-    workTime: Number(data.timeLength),
+    workTime: data.timeLength,
     tag: "专注",
     user: user,
   };
-  await createTodo(value);
-  res.json({ message: "完成专注！", type: "success" });
+  await createTodo(todo);
+  res.json({ code: CODE.SUCCESS, message: "完成专注！" });
 };
 
-export const addFeedBack = async (req, res) => {
+export const addFeedBack = async (
+  req: IRequest<{ feedBackMessage: string; rateValue: number }>,
+  res: IRespond<{}>,
+) => {
   const user = crypto.decrypt(req.headers.authorization);
   const { data } = req.body;
+  if (!data.feedBackMessage) return;
   const value = {
     message: data.feedBackMessage,
     time: new Date(),
     type: TODO_TYPE.SUGGESTION,
-    workTime: Number(data.rateValue),
+    workTime: data?.rateValue ?? 5,
     tag: "建议",
     user: user,
   };
   await createTodo(value);
-  res.json({ message: "建议发送成功！", type: "success" });
+  res.json({ code: CODE.SUCCESS, message: "建议发送成功！" });
 };
 
-export const createTip = async (req, res) => {
+export const createTip = async (req: IRequest<ITask>, res: IRespond<{}>) => {
   const { data } = req.body;
-  const user = crypto.decrypt(req.headers.authorization);
+  const user: string = crypto.decrypt(req.headers.authorization);
   const newTip = {
-    message: data.message,
-    type: Number(data.type),
+    ...data,
     time: new Date(data.time),
-    finish: Boolean(data.finish),
-    tag: data.tag,
-    workTime: Number(data.workTime),
     user: user,
   };
   const tip = await findOneTaskByQueryRule({ user: user });
   if (!tip) {
     await createTodo(newTip);
   }
-  res.json({});
+  res.json({ code: CODE.SUCCESS, message: "" });
 };

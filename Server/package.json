@@ -1,5 +1,5 @@
 {
-  "name": "test",
+  "name": "todo-server",
   "version": "1.0.0",
   "description": "",
   "main": "app.ts",
@@ -7,27 +7,38 @@
     "blueimp-md5": "^2.18.0",
     "body-parser": "^1.19.0",
     "connect-history-api-fallback": "^1.6.0",
+    "cors": "^2.8.5",
     "crypto-js": "^4.1.1",
     "dayjs": "^1.10.7",
+    "dotenv": "^16.3.1",
     "express": "^4.17.1",
     "express-session": "^1.17.2",
     "init": "^0.1.2",
-    "modbus-serial": "^8.0.3",
     "mongoose": "^5.13.5",
-    "nodemon": "^2.0.15",
-    "prettier": "^2.8.8",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.4"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "ts-node --project ./tsconfig.json -r tsconfig-paths/register ./app.ts"
+    "start": "NODE_ENV=development ts-node --esm --project ./tsconfig.json -r tsconfig-paths/register ./app.ts ",
+    "build": "NODE_ENV=production  webpack --config webpack.config.js"
   },
-  "keywords": [],
-  "author": "",
+  "author": "Shawkry",
   "license": "ISC",
   "devDependencies": {
+    "@types/body-parser": "^1.19.5",
+    "@types/connect-history-api-fallback": "^1.5.3",
+    "@types/cors": "^2.8.16",
+    "@types/crypto-js": "^4.2.1",
     "@types/express": "^4.17.17",
-    "tsconfig-paths": "^4.2.0"
+    "@types/express-session": "^1.17.10",
+    "dotenv-webpack": "^8.0.1",
+    "nodemon": "^3.0.1",
+    "path-browserify": "^1.0.1",
+    "prettier": "^3.0.3",
+    "ts-loader": "^9.5.0",
+    "tsconfig-paths": "^4.2.0",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
   }
 }

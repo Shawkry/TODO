@@ -1,9 +1,14 @@
-import crypto from "@/common/crypto.js";
+import crypto from "@/utils/crypto";
 import dayjs from "dayjs";
 import { findTasksByQueryRule } from "@/models/tasks";
 import { TASK_TYPE, TODO_TYPE, WEEK_LENGTH } from "@/constants/task";
+import { CODE } from "@/constants/http_code";
+import type { IRequest, IRespond } from "@/types";
 
-export const taskTypeDistributionData = async (req, res) => {
+export const taskTypeDistributionData = async (
+  req: IRequest<{ start: Date; end: Date }>,
+  res: IRespond<{ name: string; value: number }[]>,
+) => {
   const { data } = req.body;
   const user = crypto.decrypt(req.headers.authorization);
   const queryRule = {
@@ -11,8 +16,8 @@ export const taskTypeDistributionData = async (req, res) => {
     user: user,
   };
   const tasks = await findTasksByQueryRule(queryRule);
-  const result = [];
-  const taskTypeCount = {
+  const result: { name: string; value: number }[] = [];
+  const taskTypeCount: { [key: string]: number } = {
     [TASK_TYPE.study]: 0,
     [TASK_TYPE.work]: 0,
     [TASK_TYPE.memo]: 0,
@@ -27,10 +32,16 @@ export const taskTypeDistributionData = async (req, res) => {
   for (const type in taskTypeCount) {
     result.push({ name: type, value: taskTypeCount[type] });
   }
-  res.json(result);
+  res.json({ code: CODE.SUCCESS, message: "ok", data: result });
 };
 
-export const getWaterBallChartData = async (req, res) => {
+export const getWaterBallChartData = async (
+  req: IRequest<{ startTime: Date; endTime: Date }>,
+  res: IRespond<{
+    task: { finish: number; total: number; completeness: number };
+    summary: { finish: number; total: number; completeness: number };
+  }>,
+) => {
   const { data } = req.body;
   const user = crypto.decrypt(req.headers.authorization);
   const queryRule = {
@@ -62,26 +73,29 @@ export const getWaterBallChartData = async (req, res) => {
     result.summary = {
       finish: finishSummary.length,
       total: WEEK_LENGTH,
-      completeness: Number((finishSummary.length / 7).toFixed(2)),
+      completeness: Number((finishSummary.length / WEEK_LENGTH).toFixed(2)),
     };
   }
-  res.json(result);
+  res.json({ code: CODE.SUCCESS, message: "ok", data: result });
 };
 
-export const getTimeChartData = async (req, res) => {
+export const getTimeChartData = async (
+  req: IRequest<{ time: Date }>,
+  res: IRespond<number[]>,
+) => {
   const { data } = req.body;
   const user = crypto.decrypt(req.headers.authorization);
   const thisMonth = {
     start: new Date(dayjs(data.time).startOf("month").format("YYYY-MM-DD")),
     end: new Date(
-      dayjs(data.time).endOf("month").add(1, "day").format("YYYY-MM-DD")
+      dayjs(data.time).endOf("month").add(1, "day").format("YYYY-MM-DD"),
     ),
     len: Number(
       dayjs(data.time)
         .startOf("month")
         .add(1, "month")
         .subtract(1, "day")
-        .format("D")
+        .format("D"),
     ),
     str: dayjs(data.time).format("MM"),
   };
@@ -98,5 +112,5 @@ export const getTimeChartData = async (req, res) => {
       result[index - 1] += task.workTime;
     });
   }
-  res.json(result);
+  res.json({ code: CODE.SUCCESS, message: "ok", data: result });
 };

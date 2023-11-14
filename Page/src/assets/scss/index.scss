@@ -47,7 +47,7 @@
 }
 
 .el-button:active {
-    background: #7bb1ee !important;
+    //background: #7bb1ee !important;
     transition: 0.4s !important;
 }
 
@@ -58,9 +58,12 @@
     padding-bottom: 1rem !important;
     background    : none !important;
     color         : #315d8f !important;
-    border        : #7bb1ee 1px solid !important;
+    //border        : #7bb1ee 1px solid !important;
 }
-
+.el-input__wrapper{
+    border        : #7bb1ee 1px solid !important;
+    background    : none !important;
+}
 .el-select-dropdown__item {
     padding-right: 4vw !important;
     padding-left : 2.5vw !important;
@@ -82,12 +85,12 @@
     backdrop-filter      : blur(8px);
     border               : 2px solid rgba(255, 255, 255, 0.1);
     // box-shadow        : 0 0 80px rgba(0, 0, 0, 0.2);
-    box-shadow           : 0px 0px 8px 6px rgba(32, 32, 34, 0.03);
+    box-shadow           : 0 0 8px 6px rgba(32, 32, 34, 0.03);
     overflow-x           : scroll;
 }
 
 ::-webkit-scrollbar {
-    width: 0%;
+    width: 0;
     /*设置滚动条宽度为6px*/
 }
 
